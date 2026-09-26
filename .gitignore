@@ -1,0 +1,49 @@
+# Sistema
+desktop.ini
+Thumbs.db
+.DS_Store
+
+# Entornos y dependencias
+.env
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Datos — se ignora el contenido pero se conserva la estructura
+02_datos/**
+!02_datos/**/
+!02_datos/**/.gitkeep
+
+# Modelos entrenados y artefactos
+05_modelos/**
+!05_modelos/.gitkeep
+*.pkl
+*.pickle
+*.joblib
+
+# Resultados y entregables
+06_resultados/**
+!06_resultados/.gitkeep
+
+# Formatos de datos sueltos
+*.csv
+*.xlsx
+*.parquet
+*.feather
+*.db
+*.sqlite
+*.duckdb
+
+# Documentos
+*.pdf
+
+# Logs
+*.log
+
+# IDE
+.vscode/
+.idea/
