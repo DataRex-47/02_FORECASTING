@@ -190,6 +190,7 @@ Créalo vacío. Es donde irán credenciales y rutas sensibles, y ya está ignora
 - Comentarios de sección con el formato `# ── Título ─────────`
 - Rutas siempre con `pathlib`, nunca concatenando strings.
 - Los datos crudos de `02_datos/01_Originales/` son de **solo lectura**: nunca se sobrescriben.
+- **Funciones reutilizables**: antes de escribir una función de análisis, comprobar si ya existe en `04_scripts/utils.py`. Se importan: `from utils import frecuencias_cat`. No reescribir equivalentes. Las altas y los cambios los gestiona el agente `A_00_Bibliotecario`.
 ```
 
 ### 4.4 — `README.md` en la raíz
@@ -206,7 +207,7 @@ _(Qué problema de negocio resuelve, no qué modelo usa)_
 | `01_Documentos/` | Documentación, briefings, actas |
 | `02_datos/` | Originales · Validación · Entrenamiento · Cachés |
 | `03_notebooks/` | Pipeline de análisis, numerado por fases |
-| `04_scripts/` | Código reutilizable y de producción |
+| `04_scripts/` | Código reutilizable y de producción, incluido `utils.py` |
 | `05_modelos/` | Modelos serializados (.pkl / .joblib) |
 | `06_resultados/` | Salidas, gráficos y entregables |
 | `07_despliegue/` | API, app o proceso batch |
@@ -219,6 +220,54 @@ uv run python 04_scripts/<archivo>.py      # ejecutar un script
 ```
 ```
 
+### 4.5 — `04_scripts/utils.py` (el catálogo de funciones, importable)
+
+El proyecto no arranca con `04_scripts/` vacío: arranca con las funciones que ya existen.
+Así no se reescribe por cuarta vez la que agrupa categorías raras.
+
+**De dónde sale:** de `00_CATALOGO_FUNCIONES.md` en el vault, que es la **fuente canónica**.
+`utils.py` es código generado desde ese catálogo, nunca al revés.
+
+1. Copia el `utils.py` del último proyecto a `04_scripts/`. Si no hay ninguno a mano,
+   se genera extrayendo los bloques de código del catálogo, sección por sección.
+2. Copia también `A_00_Bibliotecario.agent.md` a `.github/agents/`. Es el agente que
+   da de alta funciones nuevas y mantiene el catálogo y `utils.py` sincronizados.
+
+**Cómo se usa** (desde un notebook de `03_notebooks/`):
+
+```python
+import sys
+sys.path.append(str(RAIZ / '04_scripts'))
+
+from utils import frecuencias_cat, graficos_eda_categoricos
+```
+
+> [!WARNING] La regla que evita el desastre silencioso
+> Si editas `utils.py` en el proyecto y no devuelves el cambio al catálogo, cada
+> proyecto acaba con su propia versión de la misma función y deja de haber una sola
+> verdad. Todo cambio entra por el catálogo; `utils.py` se regenera.
+
+> [!NOTE] Cuatro funciones del catálogo no son importables tal cual
+> `limpiar_columnas_texto`, `ranking_mi`, `log` y `validar_schema` leen variables
+> globales que en su origen venían del notebook (`BASURA`, `x`, `CONFIG`,
+> `COLUMNAS_OBLIGATORIAS`). Están marcadas en la cabecera de `utils.py`. Funcionan en
+> cuanto se les pasa esa variable por parámetro.
+
+
+### 4.6 · Plantillas Excel de variables (`01_Documentos/`)
+
+Son el mapa de qué proceso necesita cada variable (tipos, nulos, encoding, tiempo). Se rellenan durante el proyecto y se usan para refactorizar en la preproducción.
+
+1. Copia las dos plantillas vacías del vault a `01_Documentos/`, quitándoles el prefijo `Plantilla_`:
+
+```powershell
+$V = "C:\Users\Admin\Desktop\Desktop\CarpetaFisica\Data Detective\Obsidian\Python & SQL\Python & SQL\Agentes_ML\Plantillas_Excel"
+Copy-Item "$V\Plantilla_FaseDesarrollo_Transformaciones.xlsx" "01_Documentos\FaseDesarrollo_PlantillaTransformaciones.xlsx"
+Copy-Item "$V\Plantilla_FaseProduccion_Procesos.xlsx" "01_Documentos\FaseProduccion_PlantillaProcesos.xlsx"
+```
+
+2. Copia también `A_00_Excelizador.agent.md` a `.github/agents/`. Es el agente que las rellena: la de desarrollo al cerrar la transformación y la de producción antes de la preproducción.
+3. Si la ruta del vault no existe en esta máquina, avisa en el resumen final y sigue con el resto.
 ---
 
 ## PASO 5 — NOTEBOOKS DEL PIPELINE
@@ -291,6 +340,12 @@ Comprueba que todo funciona:
 uv run python -c "import numpy, pandas, sklearn, janitor; print('✅ Núcleo correcto')"
 ```
 
+Y que `utils.py` importa sin errores:
+
+```bash
+uv run python -c "import sys; sys.path.insert(0, '04_scripts'); import utils; print('✅ utils.py importa')"
+```
+
 Y comprueba **solo los bloques que se hayan instalado**. Por ejemplo, si se instaló el bloque A:
 
 ```bash
@@ -301,5 +356,5 @@ Y muestra el resumen final con:
 
 1. La estructura de carpetas creada.
 2. El núcleo y **qué bloques opcionales** se instalaron, más cuáles fallaron si alguna.
-3. El nombre del kernel de Jupyter registrado.
+3. El nombre del kernel de Jupyter registrado, y si `utils.py` importó correctamente.
 4. Los siguientes pasos sugeridos: colocar los datos en `02_datos/01_Originales/` y abrir `03_notebooks/01_Importacion_Datos.ipynb`.

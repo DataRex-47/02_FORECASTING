@@ -387,6 +387,52 @@ def regularizar_grupo(g):
     return g_diario
 
 
+# ══════════════════════════════════════════════════════════════════════
+# FUNCIÓN: rotura_stock
+# ══════════════════════════════════════════════════════════════════════
+# QUÉ HACE, EN CRISTIANO:
+#   Mira los últimos "n" días de ventas de UNA serie (un solo producto en
+#   una sola tienda). Si TODOS esos n días seguidos fueron cero ventas,
+#   apunta un 1 (sospecha de rotura de stock). Si algún día hubo venta,
+#   apunta un 0.
+#
+# CÓMO SE USA:
+#   No se llama directamente sobre todo el dataframe, se llama DENTRO de
+#   groupby().transform(). Por eso "ventas" aquí NO es toda la columna del
+#   dataset: es la columna de ventas de UN ÚNICO par tienda-producto.
+#   Y lo que devuelve es otra columna del MISMO tamaño (un 0/1 por día).
+
+def rotura_stock(ventas, n):
+    # ── PASO 1: marcar los días que vendieron CERO ────────────────────
+    # (ventas == 0) devuelve True donde no hubo venta y False donde sí.
+    # .astype(int) convierte ese True/False en 1/0.
+    # Resultado: 1 = día sin ninguna venta, 0 = día con venta.
+    es_cero = (ventas == 0).astype(int)
+
+    # ── PASO 2: contar cuántos ceros hay en los últimos n días ────────
+    # .rolling(n) crea una "ventana móvil" de n días (el día actual más
+    # los n-1 anteriores). .sum() suma los 1s que caen dentro de esa
+    # ventana. El resultado es un número entre 0 y n para cada día.
+    ceros_en_ventana = es_cero.rolling(n).sum()
+
+    # ── PASO 3: decidir si es rotura ──────────────────────────────────
+    # Si la suma es exactamente n, es que los n días seguidos estuvieron
+    # a cero => rotura confirmada => 1. En cualquier otro caso => 0.
+    return (ceros_en_ventana == n).astype(int)
+
+
+def estadistico_movil_serie(ventas, n, estadistico):
+    # Mínimo, media o máximo de los últimos n días de UNA serie.
+    # shift(1) para mirar solo al pasado: el día de hoy nunca entra en la ventana.
+    return ventas.shift(1).rolling(n).agg(estadistico)
+
+
+def media_movil_ponderada_serie(ventas, n):
+    # Media móvil ponderada exponencial (ewm) de UNA serie: lo reciente pesa más.
+    # min_periods=n deja vacíos los primeros días, igual que rolling.
+    return ventas.shift(1).ewm(span=n, min_periods=n).mean()
+
+
 
 # ────────────────────────────────────────────────────────────────────
 # 5  Texto
@@ -428,7 +474,8 @@ def ranking_mi(mutual_selector, modo='tabla'):
 
 
 def ranking_per(predictoras, permutacion):
-    # importances_mean = pérdida media de AUC al desordenar cada variable
+    # importances_mean = cuánto empeora de media la métrica (scoring) al desordenar cada variable,
+    # promediando las n_repeats veces que se desordenó (AUC en clasificación, MAE en regresión)
     ranking_per = pd.DataFrame({'variable': predictoras.columns,
                                 'importancia_per': permutacion.importances_mean}) \
                     .sort_values(by='importancia_per', ascending=False)
