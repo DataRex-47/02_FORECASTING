@@ -2,7 +2,7 @@
 tags: [bitacora, forecasting, caso-ml, contexto]
 aliases: [Bitácora Forecasting, Contexto del Proyecto 2]
 date: 2026-09-24
-updated: 2026-10-03
+updated: 2026-10-04
 status: 🌿 (Budding)
 ---
 
@@ -17,11 +17,11 @@ status: 🌿 (Budding)
 
 ## 📍 Dónde estoy
 
-**Fases 01 → 07 hechas · 08 Preproducción en curso (03/10/2026).** La 07 dejó montada la cadena de 20 modelos (MegaEscalaEstructura); ahora se refactoriza todo en funciones.
+**Fases 01 → 08 cerradas (04/10/2026).** Preproducción refactorizada en funciones, con reentrenamiento, evaluación (MAE 9,56 a 8 días; 5,75 a 1 día) y ejecución corridos. `07_despliegue/predicciones.csv` listo para Power BI.
 
 Del EDA salieron tres decisiones: modelizar a nivel **tienda-producto**, crear una **variable que capture la demanda intermitente** y usar **LightGBM**. Cómo se resuelve cada problema, explicado: `Casos_ML/Forecasting_Soluciones.md` (vault).
 
-**Siguiente acción:** seguir refactorizando en `08_Preproduccion.ipynb` (hechas todas las funciones, de `calidad_datos` a `forecast_recursivo`; borrador del informe en `06_resultados/Preproduccion/`) y después los procesos de reentrenamiento, evaluación y ejecución (clases 37 a 39).
+**Siguiente acción (chat Parte 6):** reejecutar el notebook 08 (regla de Navidad y `clip` ya puestos) y despliegue batch (clases 40 y 41).
 
 > [!IMPORTANT] 📌 Para releer — por qué se añaden variables exógenas
 > Sin el precio, la media móvil se come un bache de ventas y el modelo lo arrastra hacia
@@ -189,7 +189,7 @@ Cosas que tienen que quedar explicadas en ese informe, en cristiano:
 | Por qué 75 variables en todos los productos | El corte salió del análisis general de la fase 05: en el gráfico de MI la importancia cae casi a 0 después de la posición 67 (detrás de las ventas, el precio y las roturas solo quedan dummies de calendario y eventos), y se cortó en 75 para dejar pasar algunas de esas dummies. Se aplica el mismo corte a los 20 productos como criterio práctico y consistente; cada producto elige SUS 75 con su propio MI, pero el tamaño es el mismo |
 | Mapa de procesos | El Excel `FaseProduccion_PlantillaProcesos.xlsx` (actualizado 03/10) dice qué necesita cada variable madre |
 | Por qué 75 variables para todos los productos | El 75 salió del corte visual del MI **general** (notebook 05, gráfico de todo el tablón). Se reutiliza como corte fijo dentro de cada producto por simplicidad y control; es un parámetro (`n_variables`) y se puede afinar por serie |
-| Las 4 funciones del proceso | 1 `modelizar`: modeliza **un** producto · 2 `lanzar_entrenamiento`: modeliza **todos** los productos y guarda la lista de modelos · 3 `lanzar_ejecucion`: predice todos los productos pero **un solo día** · 4 `forecast_recursivo`: repite la 3 ocho veces para predecir **8 días** (cada predicción pasa a ser historia del día siguiente). Un modelo de ML con lags solo predice el día siguiente; ARIMA proyecta varios días de una vez |
+| Las 4 funciones del proceso | 1 `modelizar`: modeliza **un** producto · 2 `lanzar_entrenamiento`: modeliza **todos** los productos y guarda la lista de modelos · 3 `lanzar_ejecucion`: predice todos los productos pero **un solo día** · 4 `forecasting_autorregresivo`: repite la 3 ocho veces para predecir **8 días** (cada predicción pasa a ser historia del día siguiente). Un modelo de ML con lags solo predice el día siguiente; ARIMA proyecta varios días de una vez |
 | Quién llama a quién | REENTRENAMIENTO llama a `lanzar_entrenamiento`, que transforma una vez y recorre los 20 productos llamando a `modelizar`, que a su vez llama a `preseleccion_variables`. Funciones dentro de funciones |
 
 ---
@@ -205,6 +205,9 @@ Cosas que tienen que quedar explicadas en ese informe, en cristiano:
 | 5 | **`FOODS_3_288` sí es un alta real**: no tenía precio en ninguna de las dos tiendas. La conclusión "no hay productos nuevos" vale para el resto, no para este. Y por eso sus dos series empiezan en febrero (1.032 y 1.025 días), no las 1.064 que dice el informe de EDA | 🟢 anotado · matizar en el informe |
 | 6 | **Maquetas de notebooks tipo CRISP-DM.** Montar plantillas de notebook a partir de los notebooks de soporte del curso (Rex los pasará con sus markdowns). Antes, comprobar si de verdad siguen CRISP-DM. Esperar su orden | 🔵 pendiente |
 | 7 | **Evaluar de verdad en la modelización.** El notebook compara la predicción contra los mismos datos con los que entrenó (solo comprueba que el proceso funciona). En el modelo final: apartar los últimos días en `x_test` y `y_test` y medir ahí. Patrón: `Patrones/Patron_ML_01_MegaEscalaEstructura` (vault) | 🟠 modelización |
+| 8 | **Entrada de la ejecución: exactamente 15 días + 8.** `lanzar_ejecucion` elige el día a predecir como la fecha más baja que sobrevive al `dropna`, así que si se le pasa más historia predice un día viejo. Además `ventasmmp` (ewm) sale un poco distinta con 15 días que con toda la historia (117,7 vs 116,5 en FOODS_3_090). Arreglo posible: elegir el día como la primera fecha sin venta real y pasar más historia | 🔵 por decidir |
+| 9 | **Entrada de la ejecución: consulta SQL** (`07_despliegue/consulta_entrada_ejecucion.sql`, explicada en el informe de preproducción). Sin función propia. Eventos vacíos si no hay (no 0), precio planificado o último válido, ventas futuras en 0 | ✅ decidido |
+| 10 | **Navidad:** la tienda cierra el 25 de diciembre (venta real 1) y el modelo predijo 481. Solo hay 2 navidades por serie y `min_samples_leaf=20` impide aprenderlo. Arreglo puesto en `forecasting_autorregresivo` (Christmas = 0) y `clip` en `lanzar_ejecucion`; falta reejecutar | 🟢 aplicado |
 
 ---
 
