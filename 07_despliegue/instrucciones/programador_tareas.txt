@@ -1,0 +1,41 @@
+PROGRAMAR EJECUCIONES CON EL PROGRAMADOR DE TAREAS DE WINDOWS
+(instrucciones para hacerlo a mano; no hay automatización)
+
+Idea: cada día a la hora que quieras, Windows lanza ejecuciones.py. Antes, sistemas ya debe haber dejado DatosParaProduccion.csv actualizado en la carpeta.
+
+1. Abre el Programador de tareas (Win + R, escribe taskschd.msc, Enter).
+
+2. A la derecha: Crear tarea básica.
+   Nombre: Forecasting retail ejecucion
+   Descripción: Predice 8 dias y escribe predicciones.csv
+
+3. Desencadenador: Diariamente. Elige la hora (por ejemplo 07:00, después de que sistemas deje el CSV).
+
+4. Acción: Iniciar un programa. Rellena así:
+
+   Programa o script:
+   C:\Users\Admin\Desktop\Desktop\CarpetaFisica\Data Detective\Mis Casos(Importante)\PROYECTO 5 - FORECASTING RETAIL\02_FORECASTING\.venv\Scripts\python.exe
+
+   Agregar argumentos:
+   ejecuciones.py
+
+   Iniciar en (MUY IMPORTANTE, sin comillas):
+   C:\Users\Admin\Desktop\Desktop\CarpetaFisica\Data Detective\Mis Casos(Importante)\PROYECTO 5 - FORECASTING RETAIL\02_FORECASTING\07_despliegue
+
+   Si "Iniciar en" queda vacío, el script no encuentra los .pkl ni el CSV y falla.
+
+5. Finalizar. Luego abre las propiedades de la tarea y revisa:
+   a) General: marca "Ejecutar tanto si el usuario inició sesión como si no" si quieres que corra con la sesión cerrada.
+   b) Configuración: marca "Ejecutar la tarea lo antes posible si se omitió un inicio programado" (por si el PC estaba apagado).
+
+6. Probar: clic derecho sobre la tarea, Ejecutar. Comprueba que predicciones.csv cambió de fecha y hora de modificación.
+
+7. Si falla: pestaña Historial de la tarea, o ejecuta a mano en una terminal:
+   cd "<la ruta de Iniciar en>"
+   ..\.venv\Scripts\python.exe ejecuciones.py
+   El mensaje de error sale ahí.
+
+REENTRENAMIENTO
+No se programa a diario. Se lanza a mano cuando haya datos nuevos (ver explicacion.md). Si algún día quieres programarlo, es otra tarea igual a esta pero con el argumento reentrenamiento.py y frecuencia semanal o mensual, a una hora DISTINTA de la ejecución para que no se pisen.
+
+NOTA: si el PC se apaga o duerme, la tarea no corre. Para algo en serio, esto iría en un servidor.
