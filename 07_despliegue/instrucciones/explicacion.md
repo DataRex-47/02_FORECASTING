@@ -12,6 +12,7 @@ Regla de oro: todo se lanza desde DENTRO de 07_despliegue. Los scripts leen y es
 6. ohe_retail.pkl y lista_modelos_retail.pkl: salida del reentrenamiento, entrada de la ejecución.
 7. DatosParaProduccion.csv: lo genera sistemas cada cierto tiempo.
 8. predicciones.csv: resultado de ejecuciones.py.
+9. exportar_backtest.py y backtest.csv: la evaluación de diciembre guardada en un archivo, para la página 2 de Power BI (ver más abajo).
 
 ## Cómo lanzar
 
@@ -56,3 +57,17 @@ Si sistemas cambia una columna o el formato de fecha, falla aquí primero.
 ## Cuidado
 
 train.pkl, *.pkl y *.csv están en .gitignore: no suben a GitHub. Si cambias de máquina hay que moverlos a mano.
+
+## Backtest para Power BI (página 2)
+
+Qué es: la misma evaluación del notebook 08, repetida en 4 ventanas de 8 días de diciembre de 2015 (cortes 30 nov, 8, 16 y 23 dic). Se tapan las ventas de los 8 días siguientes al corte, el modelo las predice y se comparan con lo que realmente se vendió. Sirve para medir qué tan confiable es el modelo, no para pronosticar.
+
+Qué es el modelo base (baseline): una predicción boba, "hoy vendo lo mismo que vendí hace 7 días". Es la vara para saber si el modelo de verdad aporta.
+
+Cómo lanzar (desde 07_despliegue): python exportar_backtest.py
+
+Qué genera: backtest.csv, 640 filas (4 ventanas por 160). Columnas: fecha_corte, date, horizonte (1 a 8), store_id, item_id, real, pred, pred_base.
+
+Controles que deben salir (MAE por ventana, modelo y base): 9,55 y 16,17; 7,89 y 8,31; 8,97 y 6,91; 8,69 y 9,81.
+
+Cuándo repetirlo: solo si se reentrenan los modelos. No es parte de la ejecución diaria.

@@ -89,63 +89,50 @@ Para cada tamaño de 2 a 15 días se crean tres columnas sobre `ventas`: **14 ta
           ROWS BETWEEN n PRECEDING AND 1 PRECEDING)
 ```
 
-## 4. Cómo usa el modelo estas pistas
+## 4. Por qué existen estas variables: el modelo es amnésico
 
-### 4.1 Cada fila es una ficha
+> Excepción teórica en un informe de fases. La explicación completa está en el vault, nota `ML_Forecasting`, sección "El modelo es amnésico".
 
-Cada fila es **un día a predecir** y lleva dentro: identificadores (`store_id`, `item_id`), predictoras (lo que se sabe **antes** de ese día: lags, ventanas, precio pasado, rotura, calendario) y la target (`ventas` de ese día). Repitiendo miles de fichas *"con estas pistas, esta fue la respuesta"*, el modelo aprende la relación.
+**Al entrenar** el modelo ve todas las filas, pero como fichas sueltas sin orden: si se barajaran, encontraría las mismas reglas. **Al predecir** solo ve la fila que le entregas, la pasa por sus reglas y devuelve un número. No puede voltear a mirar qué pasó hace tres días: si no está escrito en esa fila, no existe.
 
-| Predictora | Papel |
+### 4.1 El lag pega el pasado en la fila de hoy
+
+Datos reales de `CA_3`, `FOODS_3_120`. El 42 entra como `ventas` el 30 de mayo, al día siguiente aparece en `ventas_lag1` y al otro en `ventas_lag2`:
+
+| date | ventas_lag2 | ventas_lag1 | rotura_stock_7_lag1 | ventas |
+|---|---|---|---|---|
+| 2013-05-29 | 0 | 0 | 1 | 0 |
+| 2013-05-30 | 0 | 0 | 1 | **42** |
+| 2013-05-31 | 0 | **42** | 0 | 2 |
+| 2013-06-01 | **42** | 2 | 0 | 55 |
+| 2013-06-02 | 2 | 55 | 0 | 60 |
+
+Cuando predice el 1 de junio, el modelo no recuerda el 42: lo lee en `ventas_lag2` de esa misma fila.
+
+### 4.2 Con una sola variable aprende un promedio ciego
+
+Ese mismo producto costó **4,98 los 1.064 días**. Si el precio fuera la única predictora, todas las filas serían iguales y el modelo predeciría el mismo número siempre. La venta real, al mismo precio:
+
+| Contexto (precio 4,98) | Venta media |
 |---|---|
-| lags y ventanas de `ventas` | el nivel: de dónde viene la serie |
-| `sell_price_lag*` | por qué cambia: si sube el precio, baja la venta |
-| `rotura_stock_*_lag1` | avisa de trampas: ceros por falta de producto |
-| calendario y eventos | estacionalidad: fines de semana y festivos |
+| Jueves | 56,7 |
+| Domingo | 77,7 |
+| Septiembre | 74,0 |
+| Diciembre | 30,8 |
+| Navidad | 0 |
 
-### 4.2 Cómo "lee" los lags y las ventanas
+Un solo número para todo se pasa en diciembre (sobrestock) y se queda corto un domingo de septiembre (rotura). Por eso cada familia de variables responde una pregunta distinta:
 
-Para LightGBM el tiempo no existe: no ve una película, ve **fichas sueltas**. El árbol aprende con preguntas del tipo *"si pasa esto y además esto otro, entonces..."*. No memoriza fechas: aprende qué significa **la combinación de pistas**.
-
-| Qué detecta | Cómo lo ve en la fila |
-|---|---|
-| **Inercia** | `ventas_lag1` frente a `ventasmmp15`: por encima del nivel habitual, viene acelerando; por debajo, frenando |
-| **Picos raros** | ayer 200 con un nivel habitual de 20: fue puntual, lo normal es volver hacia la media |
-| **Estabilidad o riesgo** | `ventasmin15` en 25 y `ventasmax15` en 30: demanda plana. De 0 a 300: producto errático |
-
-**Ejemplo, un martes (galletas):** `weekday_Tuesday` = 1, `ventas_lag1` (el lunes) = 150, `ventas_lag7` (el martes pasado) = 25, `ventasmmp15` = 28. Mirando solo el lag 1 diría 150. Con las demás pistas aplica lo aprendido: *"los lunes hay picos, los martes la demanda vuelve a su patrón y el nivel habitual es 28"*. Predicción: **entre 25 y 30**.
-
-### 4.3 Cómo distingue si un bajón es por el día o por el precio
-
-Lo **descubre aislando factores** en casi tres años de histórico, donde ha visto todas las combinaciones:
-
-| Día | Precio | Ventas |
+| Familia | Columnas en este caso | Pregunta que responde |
 |---|---|---|
-| Martes | normal (1,20) | 20 |
-| Sábado | normal (1,20) | 80 |
-| Martes | rebajado (1,00) | 35 |
-| Sábado | inflado (1,80) | 30 |
+| Precio | `sell_price_lag1` a `lag7` | ¿está caro o barato comparado con lo normal? |
+| Calendario | dummies de `month`, `weekday`, eventos | ¿en qué momento del año y de la semana estamos? |
+| Memoria reciente | `ventas_lag1` a `lag15`, ventanas | ¿a qué ritmo viene vendiendo? |
+| Estado operativo | `rotura_stock_*_lag1` | ¿se podía vender o no había producto? |
 
-1. **Efecto del día:** con el precio quieto, el martes siempre vende bastante menos que el sábado.
-2. **Efecto del precio:** un sábado (día fuerte) que vendió 30 en vez de 80 tenía el precio en 1,80. El día era bueno, así que el bajón es **del precio**.
+### 4.3 El falso negativo de la rotura
 
-En el árbol (no calcula porcentajes, corta por umbrales de cada columna):
-
-```text
-¿weekday_Tuesday = 1?
- ├── SÍ → ¿sell_price_lag1 > 1,50?
- │         ├── SÍ → ventas esperadas: 8   (doble bajón: día flojo y producto caro)
- │         └── NO → ventas esperadas: 20  (bajón normal por ser martes)
- └── NO → ...
-```
-
-### 4.4 Por qué no basta con la serie de ventas sola
-
-Un método que solo mira el histórico de ventas asume que el futuro repite el pasado. En retail falla por cuatro lados:
-
-1. **Ciego ante el precio:** si el precio se dobla y las ventas caen de 300 a 90, ese bache se cuela en la media móvil y se arrastra hacia adelante, aunque el precio ya haya vuelto a la normalidad. Con `sell_price_lag*`, el modelo lo atribuye al precio y no predice a la baja cuando el precio se normaliza.
-2. **Confunde "nadie lo quiere" con "no había producto":** 10 días a 0 por falta de stock le hacen proyectar ceros. Con la rotura entiende que, al reponer, la demanda vuelve.
-3. **Ciego al calendario:** dos días con el mismo lag y el mismo precio (un sábado y un miércoles) serían iguales para él. Por eso se derivan de la fecha `year`, `month`, `wday`, `weekday` y los eventos (`event_name_1`, `event_type_1`; sin evento va como `Sin_evento`).
-4. **No aprende de otras series:** con las 20 series juntas, el modelo aprende reglas comunes a productos y tiendas parecidos.
+`FOODS_3_120` pasó sus primeros 149 días en 0 **con precio**. Sin la rotura, el modelo aprende "a 4,98 este producto no se vende" y baja sus predicciones. Con `rotura_stock_7_lag1 = 1` entiende que esos ceros fueron por falta de producto: el 30 de mayo se repuso y vendió 42 (tabla 4.1).
 
 ## 5. Variables eliminadas
 
@@ -203,6 +190,6 @@ Los árboles cortan por umbrales (*"¿ventas_lag15 > 210?"*): importa el orden d
 1. `shift(1)` antes de `rolling`: sin él hay fuga.
 2. `groupby` + `transform`: un dato por fila, calculado solo con su serie. En SQL, `OVER (PARTITION BY ...)`.
 3. Un lag no predice: traslada el pasado a la fila.
-4. El modelo no ve tiempo, ve fichas; aprende de la combinación de pistas.
+4. El modelo es amnésico: al predecir solo ve la fila que le entregas. Lo que no está en la fila no existe.
 5. OHE con `drop='first'` y `handle_unknown='ignore'`.
 6. Solo entra lo que se conocería al predecir.

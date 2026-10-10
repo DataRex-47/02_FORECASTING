@@ -25,8 +25,10 @@ __pycache__/
 *.pickle
 *.joblib
 
-# Resultados y entregables
+# Resultados y entregables: se ignoran los archivos pesados, pero los informes en Markdown sí suben
 06_resultados/**
+!06_resultados/**/
+!06_resultados/**/*.md
 !06_resultados/.gitkeep
 
 # Formatos de datos sueltos
@@ -37,6 +39,12 @@ __pycache__/
 *.db
 *.sqlite
 *.duckdb
+
+# Excepción: las tres salidas pequeñas que alimentan el tablero de Power BI
+# (el resto de datos, la base original y los modelos siguen sin subir)
+!07_despliegue/predicciones.csv
+!07_despliegue/backtest.csv
+!07_despliegue/DatosParaProduccion.csv
 
 # Documentos
 *.pdf
