@@ -580,6 +580,7 @@ def plot_gain_multi(y, probas, labels=None):
     plt.xlabel("% observaciones"); plt.ylabel("% objetivo acumulado")
     plt.title("Curva de Ganancia Acumulada")
     plt.legend()
+    plt.grid(True)
     plt.show();
 
 
@@ -608,6 +609,7 @@ def plot_lift_multi(y, probas, labels=None):
     plt.xlabel("% observaciones"); plt.ylabel("Lift")
     plt.title("Curva de Lift")
     plt.legend()
+    plt.grid(True)
     plt.show();
 
 
@@ -922,3 +924,127 @@ def inspeccionar_pipeline(pipe):
             )
 
     return informe
+
+
+# ── Añadidas desde el catálogo (30/10/2026) ─────────────────────────
+
+
+def atipicos_cuantiles(variable, q_inf=0.25, q_sup=0.75, k=1.5):
+    """
+    Devuelve los índices de los valores fuera de los límites calculados con cuantiles.
+
+    Por defecto es la regla de Tukey (la del boxplot): se pasa de 1,5 veces el
+    rango intercuartílico (IQR = Q3 - Q1) por debajo de Q1 o por encima de Q3.
+    Para recortar por percentiles fijos (por ejemplo el 1 % y el 99 %), usar
+    q_inf=0.01, q_sup=0.99 y k=0.
+    """
+    variable = variable.dropna()          # los nulos, fuera por ahora
+
+    # ── Límites a partir de los cuantiles ─────────────────────────────
+    cuantil_inf = variable.quantile(q_inf)
+    cuantil_sup = variable.quantile(q_sup)
+    rango = cuantil_sup - cuantil_inf
+
+    lim_inf = cuantil_inf - k * rango
+    lim_sup = cuantil_sup + k * rango
+
+    # ── Índices de los que caen fuera (con bucle tradicional) ─────────
+    indices = []
+
+    for indice, valor in variable.items():
+        if valor < lim_inf or valor > lim_sup:
+            indices.append(indice)
+
+    return indices
+
+
+def contar_atipicos(df, variable, num_desv_tip=4, metodo='desv_tip', k=1.5):
+    """
+    Cuenta cuántas veces aparece cada valor atípico de una variable.
+    metodo='desv_tip' usa atipicos_desv_tip (num_desv_tip desviaciones típicas).
+    metodo='cuantiles' usa atipicos_cuantiles (k veces el IQR).
+    """
+    if metodo == 'desv_tip':
+        indices = atipicos_desv_tip(df[variable], num_desv_tip)
+    elif metodo == 'cuantiles':
+        indices = atipicos_cuantiles(df[variable], k=k)
+    else:
+        raise ValueError("metodo debe ser 'desv_tip' o 'cuantiles'")
+
+    return df.loc[indices, variable].value_counts().sort_index()
+
+
+def convertir_a_int(df, columnas):
+    """
+    Convierte las columnas indicadas a entero.
+    Falla si aún quedan nulos: hay que imputar antes.
+    """
+    df = df.copy()
+
+    for columna in columnas:
+        df[columna] = df[columna].astype(int)
+
+    return df
+
+
+def eliminar_indices(indices, *dataframes):
+    """
+    Elimina los mismos registros (por índice) de varios DataFrames a la vez.
+    Sirve cuando df, cat y num deben seguir teniendo las mismas filas.
+    Devuelve una tupla con los DataFrames en el mismo orden en que entraron.
+    """
+    resultado = []
+
+    for df in dataframes:
+        resultado.append(df[~df.index.isin(indices)])
+
+    return tuple(resultado)
+
+
+def reporting_regresion(real, pred, n_tramos=5, residuos=False):
+    """Reporting de un regresor, con los gráficos uno debajo de otro y una tabla por tramos
+    del valor real. Sirve igual con porcentajes que con importes.
+    residuos=True añade el histograma de residuos."""
+    real = np.asarray(real).ravel()
+    pred = np.asarray(pred).ravel()
+    residuo = real - pred
+
+    paneles = ['nube', 'densidad'] + (['residuos'] if residuos else [])
+    fig, ejes = plt.subplots(len(paneles), 1, figsize=(9, 5 * len(paneles)))
+    ejes = np.atleast_1d(ejes)
+
+    for eje, panel in zip(ejes, paneles):
+        if panel == 'nube':
+            # Real contra predicho: si el modelo acierta, la nube se pega a la diagonal roja.
+            # Una franja horizontal significa que predice casi lo mismo para todos.
+            eje.scatter(real, pred, alpha=0.3, s=8)
+            lim = [min(real.min(), pred.min()), max(real.max(), pred.max())]
+            eje.plot(lim, lim, 'r--', label='Predicción perfecta')
+            eje.set_xlabel('Valor real'); eje.set_ylabel('Valor predicho')
+            eje.set_title('Real contra predicho'); eje.legend()
+        elif panel == 'densidad':
+            # Si la curva predicha es mucho más estrecha que la real,
+            # el modelo se agrupa en torno a la media y no llega a los extremos.
+            sns.kdeplot(real, ax=eje, label='Real')
+            sns.kdeplot(pred, ax=eje, label='Predicho')
+            eje.set_title('Distribución real y predicha'); eje.legend()
+        else:
+            # Residuo = real menos predicho. Positivo: el modelo se queda corto. Negativo: se pasa.
+            eje.hist(residuo, bins=30, edgecolor='black')
+            eje.axvline(0, color='r', linestyle='--')
+            eje.set_xlabel('Residuo (real menos predicho)'); eje.set_title('Residuos')
+        eje.grid(True)
+
+    plt.tight_layout()
+    plt.show();
+
+    # Tabla: el error medio en cada tramo (misma cantidad de casos por tramo)
+    tramos = pd.qcut(real, n_tramos, duplicates='drop')
+    tabla = (pd.DataFrame({'real': real, 'pred': pred, 'error_abs': np.abs(residuo)})
+               .groupby(tramos, observed=True)
+               .agg(casos=('real', 'size'), real_medio=('real', 'mean'),
+                    pred_medio=('pred', 'mean'), error_medio=('error_abs', 'mean'))
+               .round(3))
+    mae = np.abs(residuo).mean()
+    print(f"MAE: {mae:.3f}  |  error medio sobre el real medio: {mae / abs(real.mean()):.1%}")
+    return tabla

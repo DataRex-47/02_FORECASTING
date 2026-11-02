@@ -2,7 +2,7 @@
 tags: [bitacora, forecasting, caso-ml, contexto]
 aliases: [Bitácora Forecasting, Contexto del Proyecto 2]
 date: 2026-09-24
-updated: 2026-10-04
+updated: 2026-10-31
 status: 🌿 (Budding)
 ---
 
@@ -17,11 +17,19 @@ status: 🌿 (Budding)
 
 ## 📍 Dónde estoy
 
-**Fases 01 → 08 cerradas (04/10/2026).** Preproducción refactorizada en funciones, con reentrenamiento, evaluación (MAE 9,56 a 8 días; 5,75 a 1 día) y ejecución corridos. `07_despliegue/predicciones.csv` listo para Power BI.
+**Caso cerrado (27/10/2026).** Fases 01 a 08, despliegue batch, backtest, tablero y README terminados.
 
-Del EDA salieron tres decisiones: modelizar a nivel **tienda-producto**, crear una **variable que capture la demanda intermitente** y usar **LightGBM**. Cómo se resuelve cada problema, explicado: `Casos_ML/Forecasting_Soluciones.md` (vault).
+| Qué | Resultado |
+|---|---|
+| Modelos | 20 modelos `HistGradientBoostingRegressor` (uno por tienda y producto), 75 variables por información mutua |
+| Evaluación | Backtest en cuatro ventanas de diciembre: **MAE 8,77** frente a 10,30 de la regla simple (mejora de 14,8 %). Pierde en la ventana del 17 al 24 |
+| Pronóstico | 24 al 31 de diciembre de 2015 en `07_despliegue/predicciones.csv`, con el 25 de diciembre forzado a 0 |
+| Tablero | `07_despliegue/Tablero_Ventas_v3.pbix`, dos páginas (pronóstico y confiabilidad) |
+| Documentación | `README.md`, un informe por fase en `06_resultados/` e instrucciones en `07_despliegue/instrucciones/` |
 
-**Siguiente acción (chat Parte 6):** reejecutar el notebook 08 (regla de Navidad y `clip` ya puestos) y despliegue batch (clases 40 y 41).
+Del EDA salieron tres decisiones: modelizar a nivel **tienda-producto**, crear una **variable que capture la demanda intermitente** y usar un modelo de boosting de árboles (decidido como LightGBM; en la modelización se usó **HistGradientBoosting**). Cómo se resuelve cada problema, explicado: `Casos_ML/Forecasting_Soluciones.md` (vault).
+
+**Siguiente acción:** ninguna en este caso. Queda como histórico; el trabajo sigue en el Caso 3 (Scoring de Riesgos). El GIF del tablero ya está en `docs/tablero.gif` (31/10/2026) y el README lo muestra.
 
 > [!IMPORTANT] 📌 Para releer — por qué se añaden variables exógenas
 > Sin el precio, la media móvil se come un bache de ventas y el modelo lo arrastra hacia
@@ -35,7 +43,7 @@ Del EDA salieron tres decisiones: modelizar a nivel **tienda-producto**, crear u
 
 ```
 A_01 Import ─► A_02 Calidad ─► A_03 EDA ─► A_04 Transform ─► A_05 Preselección ─► A_07 Modelo ─► A_08/A_09 ─► A_10 Batch
-    ✅             ✅             ✅            ✅                 ✅              📍 AQUÍ         ⬜            ⬜
+    ✅             ✅             ✅            ✅                 ✅                 ✅             ✅            ✅
 ```
 
 **Diferencia con el caso 1:** aquí la salida no es una API, es un **proceso batch** que deja una tabla de predicciones a 8 días, y encima un tablero.
@@ -64,7 +72,7 @@ A_01 Import ─► A_02 Calidad ─► A_03 EDA ─► A_04 Transform ─► A_0
 |---|---|---|
 | Forecasting jerárquico + reconciliación | Se modeliza a nivel **tienda-producto**; si se pide el total, se reconcilia | ✅ decidido |
 | Demanda intermitente | **Variable sintética de posible rotura** (no hay inventario) | ✅ decidido · se construye en 04 |
-| Modelización masiva de SKU | **LightGBM** | ✅ decidido |
+| Modelización masiva de SKU | Boosting de árboles: decidido **LightGBM**, usado **HistGradientBoosting** | ✅ resuelto |
 | Horizonte a 8 días | Estrategia multi-horizonte | ⬜ pendiente de materia |
 
 ---
@@ -120,7 +128,7 @@ A_01 Import ─► A_02 Calidad ─► A_03 EDA ─► A_04 Transform ─► A_0
 
 **Conclusiones:** estructura jerárquica · productos que parecen nuevos por tienda pero no en general · demanda intermitente.
 
-**Acciones:** modelizar a nivel tienda-producto · variable que capture la demanda intermitente · LightGBM.
+**Acciones:** modelizar a nivel tienda-producto · variable que capture la demanda intermitente · boosting de árboles (LightGBM en el plan, HistGradientBoosting en la práctica).
 
 **En disco:** `03_train_tablon_eda.pkl` (sin transformaciones: igual que al salir de calidad) · informe en `06_resultados/EDA/`
 
@@ -157,7 +165,7 @@ A_01 Import ─► A_02 Calidad ─► A_03 EDA ─► A_04 Transform ─► A_0
 
 ## 5️⃣ Preselección · A_05 ✅
 
-> [!QUESTION]- ¿Se aplica preselección si el modelo es LightGBM (árboles)?
+> [!QUESTION]- ¿Se aplica preselección si el modelo es de árboles (LightGBM o HistGradientBoosting)?
 > No haría falta, porque los árboles seleccionan variables solos. Aquí se hace solo como **comparación de métodos** sobre el tablón general, para tener un recorte de partida. La selección buena se hará producto a producto en la fase 07.
 
 - Se comparan **3 métodos**: **Mutual Information** (75 variables), **RFE** (63, la mitad por defecto) y **Permutation Importance** (74).
@@ -167,7 +175,7 @@ A_01 Import ─► A_02 Calidad ─► A_03 EDA ─► A_04 Transform ─► A_0
 
 **En disco:** `03_Entrenamiento/x_preseleccionado.pkl` (20.909 × 78) + `y_preseleccionado.pkl` (`ventas`) · lista en `01_Documentos/Variables_preseleccionadas.txt` · informe en `06_resultados/Preseleccion/`
 
-> [!NOTE] El dataset preseleccionado es una **prueba a nivel general**: en la fase 07 se repite el mismo trabajo a escala real (20 productos con `for`, cada uno con su propia selección MI + LightGBM con hiperparámetros). Como allí se vuelve a seleccionar, este recorte general no es el resultado final. `07_Modelizacion.ipynb` tampoco guarda dataset.
+> [!NOTE] El dataset preseleccionado es una **prueba a nivel general**: en la fase 07 se repite el mismo trabajo a escala real (20 productos con `for`, cada uno con su propia selección MI + HistGradientBoosting con hiperparámetros). Como allí se vuelve a seleccionar, este recorte general no es el resultado final. `07_Modelizacion.ipynb` tampoco guarda dataset.
 
 > [!EXAMPLE]- 🏋️ Practica
 > Ordena las variables por Mutual Information y comprueba cuántas coinciden con el top-63 de RFE.
@@ -200,14 +208,16 @@ Cosas que tienen que quedar explicadas en ese informe, en cristiano:
 |:--:|---|---|
 | 1 | **¿20 modelos o uno?** Decidido: **20 modelos** (uno por serie tienda-producto, bottom-up). La selección de variables se repetirá dentro de cada uno | ✅ decidido |
 | 2 | Índice `date` es texto → convertir a datetime | 🟠 fase 04 |
-| 3 | Elegir la métrica de error (¿por serie o agregada? CA_4 vende 4 veces menos que CA_3) | 🔵 por decidir |
-| 4 | Herramienta del tablero final: Power BI, Tableau o Excel | 🔵 por decidir |
+| 3 | Elegir la métrica de error (¿por serie o agregada? CA_4 vende 4 veces menos que CA_3) | 🟢 MAE por serie y día (el MAPE no sirve con ceros) |
+| 4 | Herramienta del tablero final: Power BI, Tableau o Excel | ✅ Power BI |
 | 5 | **`FOODS_3_288` sí es un alta real**: no tenía precio en ninguna de las dos tiendas. La conclusión "no hay productos nuevos" vale para el resto, no para este. Y por eso sus dos series empiezan en febrero (1.032 y 1.025 días), no las 1.064 que dice el informe de EDA | 🟢 anotado · matizar en el informe |
 | 6 | **Maquetas de notebooks tipo CRISP-DM.** Montar plantillas de notebook a partir de los notebooks de soporte del curso (Rex los pasará con sus markdowns). Antes, comprobar si de verdad siguen CRISP-DM. Esperar su orden | 🔵 pendiente |
-| 7 | **Evaluar de verdad en la modelización.** El notebook compara la predicción contra los mismos datos con los que entrenó (solo comprueba que el proceso funciona). En el modelo final: apartar los últimos días en `x_test` y `y_test` y medir ahí. Patrón: `Patrones/Patron_ML_01_MegaEscalaEstructura` (vault) | 🟠 modelización |
+| 7 | **Evaluar de verdad en la modelización.** El notebook compara la predicción contra los mismos datos con los que entrenó (solo comprueba que el proceso funciona). En el modelo final: apartar los últimos días en `x_test` y `y_test` y medir ahí. Patrón: `Patrones/Patron_ML_01_MegaEscalaEstructura` (vault) | ✅ resuelto con el backtest de cuatro ventanas |
 | 8 | **Entrada de la ejecución: exactamente 15 días + 8.** `lanzar_ejecucion` elige el día a predecir como la fecha más baja que sobrevive al `dropna`, así que si se le pasa más historia predice un día viejo. Además `ventasmmp` (ewm) sale un poco distinta con 15 días que con toda la historia (117,7 vs 116,5 en FOODS_3_090). Arreglo posible: elegir el día como la primera fecha sin venta real y pasar más historia | 🔵 por decidir |
 | 9 | **Entrada de la ejecución: consulta SQL** (`07_despliegue/consulta_entrada_ejecucion.sql`, explicada en el informe de preproducción). Sin función propia. Eventos vacíos si no hay (no 0), precio planificado o último válido, ventas futuras en 0 | ✅ decidido |
-| 10 | **Navidad:** la tienda cierra el 25 de diciembre (venta real 1) y el modelo predijo 481. Solo hay 2 navidades por serie y `min_samples_leaf=20` impide aprenderlo. Arreglo puesto en `forecasting_autorregresivo` (Christmas = 0) y `clip` en `lanzar_ejecucion`; falta reejecutar | 🟢 aplicado |
+| 10 | **Navidad:** la tienda cierra el 25 de diciembre (venta real 1) y el modelo predijo 481. Solo hay 2 navidades por serie y `min_samples_leaf=20` impide aprenderlo. Arreglo puesto en `forecasting_autorregresivo` (Christmas = 0) y `clip` en `lanzar_ejecucion`; reejecutado, el 25 de diciembre sale en 0 | ✅ resuelto |
+| 11 | **FOODS_3_090:** casi dejó de venderse desde el 1 de diciembre (202 y 42 unidades en todo diciembre, antes unas 3.500 al mes en CA_3 y 900 en CA_4). El modelo, entrenado hasta el 30 de noviembre, nunca vio ese quiebre y sobreestima: en CA_4 predijo 806 unidades contra 42 reales. Sin datos de inventario no se sabe si fue quiebre de stock o salida de catálogo. Revisar con el negocio antes de usar el pronóstico para pedidos | 🟠 abierto |
+| 12 | La parrilla de hiperparámetros tiene una sola opción: es un punto de partida, no un techo | 🔵 por mejorar |
 
 ---
 
