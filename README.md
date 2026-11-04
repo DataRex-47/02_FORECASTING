@@ -137,6 +137,24 @@ La base original (`hipermercado.db`), `train.pkl` y los modelos no están en el 
 * [Diccionario de métricas de Power BI](07_despliegue/Diccionario_Metricas_PowerBI.md)
 * Informes por fase en `06_resultados/`, por ejemplo [preproducción y evaluación](06_resultados/Preproduccion/informe_preproduccion.md) y [modelización](06_resultados/Modelizacion/informe_modelizacion.md)
 
+## Qué hace cada archivo de `07_despliegue`
+
+| Archivo | Qué hace |
+|---|---|
+| `reentrenamiento.py` | Entrena los 20 modelos con los datos históricos y guarda el codificador y los modelos. Se corre solo cuando hay datos nuevos |
+| `ejecuciones.py` | Lee la entrada, predice los próximos 8 días, uno por uno, y escribe `predicciones.csv` |
+| `exportar_backtest.py` | Repite la evaluación de diciembre en cuatro cortes y escribe `backtest.csv` |
+| `funciones.py` | Biblioteca del proceso: limpieza, variables, entrenamiento y pronóstico recursivo. Los tres scripts anteriores la usan |
+| `consulta_entrada_ejecucion.sql` | Consulta que arma `DatosParaProduccion.csv` desde la base de ventas |
+| `DatosParaProduccion.csv` | Entrada del pronóstico: 15 días reales más los 8 días por predecir |
+| `predicciones.csv` | Resultado: ventas esperadas por tienda, producto y día. Alimenta la página 1 del tablero |
+| `backtest.csv` | Real, modelo y regla simple en cada corte de prueba. Alimenta la página 2 del tablero |
+| `Tablero_Ventas_v3.pbix` | Tablero de Power BI con las dos páginas |
+| `Diccionario_Metricas_PowerBI.md` | Definición de cada medida del tablero |
+| `tablero_ventas.gif` | Recorrido corto del tablero |
+| `instrucciones/` | Cómo operar el despliegue y cómo programar la ejecución diaria |
+| `train.pkl`, `ohe_retail.pkl`, `lista_modelos_retail.pkl` | Datos de entrenamiento, codificador y modelos. Solo existen en local, no se suben |
+
 ## Autor
 
 Andrés Miranda, analista de datos.
