@@ -2,7 +2,7 @@
 
 Proceso en Python que predice, para 20 series (2 tiendas por 10 productos), cuánto se va a vender en los próximos 8 días, y un tablero en Power BI que muestra el pronóstico y mide qué tan confiable es.
 
-![Tablero de Power BI](docs/tablero.mov)
+![Tablero de Power BI](docs/tableroo.gif)
 
 ## El problema de negocio
 
