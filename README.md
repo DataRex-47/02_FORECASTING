@@ -65,30 +65,20 @@ El modelo gana en 3 de las 4 ventanas y es más parejo (su error va de 7,9 a 9,6
 
 1. **El modelo supera a la regla simple, pero no siempre.** La regla funciona cuando las semanas se parecen y falla cuando la semana anterior fue atípica. Mostrar la ventana donde pierde es parte del resultado.
 2. **El error crece con el horizonte.** Pasa de 6,8 unidades en el día 1 a 9,3 en el día 8, por el efecto recursivo.
-3. **Un solo producto explica la mayor parte del error de CA_4, y no es un fallo del proceso.** FOODS_3_090 vendía unas 3.500 unidades al mes en CA_3 y unas 900 en CA_4 hasta noviembre. Desde el 1 de diciembre casi dejó de venderse en las dos tiendas (202 y 42 unidades en todo diciembre). En las cuatro ventanas de prueba el modelo predijo 806 unidades en CA_4 contra 42 reales, y ese producto aporta unas 764 de las 779 unidades de sobreestimación de la tienda.
+3. **Un solo producto explica la mayor parte del error de CA_4, y no es un fallo del proceso.** FOODS_3_090 vendía unas 3.500 unidades al mes en CA_3 y unas 900 en CA_4, y desde el 1 de diciembre casi dejó de venderse en las dos tiendas (202 y 42 unidades en todo diciembre). Diciembre se apartó desde el inicio como validación, así que ni el análisis exploratorio ni el entrenamiento (hasta el 30 de noviembre) podían ver ese cambio. En las pruebas el modelo predijo 806 unidades en CA_4 contra 42 reales.
 
-   **Por qué no se vio antes.** Diciembre se apartó desde el inicio como validación, así que el análisis exploratorio llega solo hasta el 30 de noviembre y el modelo se entrenó con esos mismos datos. El apagón empieza el 1 de diciembre: ni el análisis ni el modelo podían verlo. Es una consecuencia del diseño, que busca justamente que el modelo se pruebe con algo que no conoce. En el entrenamiento, la racha más larga de ceros de ese producto en CA_3 fue de 6 días, así que nada le hacía pensar que podía pasar.
+   ![Ventas medias por mes: FOODS_3_090 frente a un producto estable](docs/estacionalidad_mensual.png)
 
-   **Qué pasa con y sin ese producto.** El producto es el 10 % de las filas evaluadas y concentra el 26 % del error.
+   *Ventas diarias medias por mes del entrenamiento (2013 a noviembre de 2015, promedio de las dos tiendas). A la izquierda FOODS_3_090, que sube hasta septiembre y baja tres meses seguidos hasta diciembre, su mes más bajo (unas 33 unidades). A la derecha FOODS_3_586, un producto estable como referencia.*
 
    | Medida | Con FOODS_3_090 | Sin FOODS_3_090 |
    |---|---|---|
-   | Error del modelo, total | 8,77 | 7,25 |
-   | Error de la regla simple, total | 10,30 | 9,09 |
-   | Mejora del modelo sobre la regla simple | 14,8 % | 20,2 % |
+   | Error del modelo | 8,77 | 7,25 |
+   | Error de la regla simple | 10,30 | 9,09 |
+   | Mejora del modelo | 14,8 % | 20,2 % |
    | Error del modelo en CA_4 | 5,97 | 3,98 |
-   | Error de la regla simple en CA_4 | 5,22 | 4,66 |
 
-   Con el producto, en CA_4 la regla simple le gana al modelo. Sin él, el modelo gana. Aun así no se quita del resultado: es parte de lo que le pasa a un negocio real, y la regla simple tampoco lo habría anticipado (su error en ese producto es 21,2 contra 22,5 del modelo).
-
-   **Qué pudo pasar con el producto.** Los datos no traen inventario ni catálogo, así que no se puede comprobar. Las explicaciones razonables son:
-   * se acabó el stock y no llegó más mercancía;
-   * el producto salió del catálogo o se descontinuó;
-   * lo reemplazó otra marca o presentación, o empezó a venderse bajo otro código;
-   * cambió su precio o su lugar en la tienda;
-   * era una oferta o temporada que terminó.
-
-   Hay una pista: en la Navidad de 2014 a 2015 este mismo producto ya había tenido 34 días en cero en CA_4. Con una sola Navidad de historia no se puede saber si es un patrón navideño o una coincidencia. Queda pendiente revisar por qué el modelo de CA_4 no lo capta pese a haber visto rachas largas de ceros en años anteriores.
+   El producto es el 10 % de las filas y concentra el 26 % del error. No se quita del resultado, porque la regla simple tampoco lo habría anticipado. Los datos no traen inventario ni catálogo, así que la causa no se puede comprobar: pudo ser stock agotado, salida del catálogo, reemplazo por otro producto o código, o una oferta que terminó. El gráfico apunta a una causa estacional: es un producto de temporada que ya caía hacia fin de año. Pero la caída de 2015 fue mucho mayor: unas 4 unidades por tienda y día en diciembre, contra unas 33 de media en los diciembres anteriores. Otra pista: en la Navidad de 2014 a 2015 ya había tenido 34 días en cero en CA_4, pero con una sola Navidad de historia no se sabe si es un patrón.
 4. **Consecuencia para el pronóstico actual.** En los 15 días reales previos al corte, FOODS_3_090 vendió 34 unidades en CA_3 y ninguna en CA_4, y aun así el pronóstico le asigna 383 unidades en 8 días (12,7 % del total). Ese número debe tomarse con cautela y revisarse con el negocio antes de usarlo para pedidos. En producción la respuesta natural es reentrenar con los datos más recientes y vigilar el sesgo por producto, que es justo lo que muestra la página 2.
 5. **La variación de ritmo de 17,4 % a la baja está inflada por la Navidad.** Con el 25 de diciembre en cero, el promedio diario del pronóstico baja. Sin ese día, los 7 días abiertos promedian 432,3, un 5,6 % por debajo del ritmo real reciente.
 
