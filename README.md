@@ -37,6 +37,8 @@ exportar_backtest.py → backtest.csv (4 ventanas de diciembre) → página 2 de
 
 La idea que ordena el proyecto: **todo el trabajo difícil ocurre en Python y Power BI es solo la capa de presentación.** Power Query hace limpieza ligera, el modelo de datos es una estrella simple y las medidas DAX son pocas y están documentadas.
 
+**En dos pasos separados.** `reentrenamiento.py` entrena un modelo por serie y los guarda en archivos (solo cuando hay datos nuevos). `ejecuciones.py` carga esos modelos, predice los 8 días y escribe `predicciones.csv` (a diario). Los dos usan las funciones de `funciones.py` y solo se comunican por los modelos guardados.
+
 **El modelo.** Un modelo por serie (20 en total) con `HistGradientBoostingRegressor`. Cada uno usa 75 variables elegidas por información mutua: ventas de los 15 días anteriores, precios de los 7 anteriores, mínimos, máximos y medias móviles, una variable de posible rotura de stock (3, 7 y 15 días seguidos en cero) y calendario (mes, día de la semana, eventos).
 
 **Pronóstico recursivo.** El modelo predice un solo día. Para predecir 8, cada predicción se escribe como si fuera la venta de ese día y alimenta los rezagos del siguiente. Por eso el error crece con el horizonte.
