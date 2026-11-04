@@ -16,6 +16,7 @@ Quien repone inventario necesita responder una pregunta: **cuánto se va a vende
 | ¿Qué tanto se equivoca el modelo? | 8,77 unidades por serie y día (MAE) en cuatro ventanas de prueba de diciembre |
 | ¿Vale la pena frente a una regla simple? | Sí. La regla simple (vender lo mismo que hace 7 días) se equivoca 10,30, así que el modelo mejora 14,8 % |
 | ¿Se pasa o se queda corto? | En promedio se pasa un 1,9 %, con una excepción importante (ver hallazgos) |
+| ¿Y si se deja fuera el producto que se apagó en diciembre? | El error baja a 7,25 contra 9,09 de la regla simple, una mejora de 20,2 %. Se explica en el hallazgo 3 |
 
 El 25 de diciembre el pronóstico es 0 por una regla de negocio: la tienda cierra.
 
@@ -64,7 +65,30 @@ El modelo gana en 3 de las 4 ventanas y es más parejo (su error va de 7,9 a 9,6
 
 1. **El modelo supera a la regla simple, pero no siempre.** La regla funciona cuando las semanas se parecen y falla cuando la semana anterior fue atípica. Mostrar la ventana donde pierde es parte del resultado.
 2. **El error crece con el horizonte.** Pasa de 6,8 unidades en el día 1 a 9,3 en el día 8, por el efecto recursivo.
-3. **Un producto explica casi todo el sesgo de CA_4, y no es un error del proceso.** FOODS_3_090 vendía unas 3.500 unidades al mes en CA_3 y unas 900 en CA_4 hasta noviembre, y desde el 1 de diciembre casi dejó de venderse en las dos tiendas (202 y 42 unidades en todo diciembre). El modelo se entrenó con datos hasta el 30 de noviembre, así que nunca vio ese quiebre: en CA_3 su racha más larga de ceros en el entrenamiento fue de 6 días. En las cuatro ventanas de prueba el modelo predijo 806 unidades en CA_4 contra 42 reales, y ese producto aporta unas 764 de las 779 unidades de sobreestimación de la tienda. Los datos no traen inventario, así que la causa (quiebre de stock o salida de catálogo) no se puede comprobar. Queda sin explicar por qué CA_4, que sí tuvo rachas largas de ceros en años anteriores, tampoco lo capta: habría que mirar qué variables usa el modelo de esa serie.
+3. **Un solo producto explica la mayor parte del error de CA_4, y no es un fallo del proceso.** FOODS_3_090 vendía unas 3.500 unidades al mes en CA_3 y unas 900 en CA_4 hasta noviembre. Desde el 1 de diciembre casi dejó de venderse en las dos tiendas (202 y 42 unidades en todo diciembre). En las cuatro ventanas de prueba el modelo predijo 806 unidades en CA_4 contra 42 reales, y ese producto aporta unas 764 de las 779 unidades de sobreestimación de la tienda.
+
+   **Por qué no se vio antes.** Diciembre se apartó desde el inicio como validación, así que el análisis exploratorio llega solo hasta el 30 de noviembre y el modelo se entrenó con esos mismos datos. El apagón empieza el 1 de diciembre: ni el análisis ni el modelo podían verlo. Es una consecuencia del diseño, que busca justamente que el modelo se pruebe con algo que no conoce. En el entrenamiento, la racha más larga de ceros de ese producto en CA_3 fue de 6 días, así que nada le hacía pensar que podía pasar.
+
+   **Qué pasa con y sin ese producto.** El producto es el 10 % de las filas evaluadas y concentra el 26 % del error.
+
+   | Medida | Con FOODS_3_090 | Sin FOODS_3_090 |
+   |---|---|---|
+   | Error del modelo, total | 8,77 | 7,25 |
+   | Error de la regla simple, total | 10,30 | 9,09 |
+   | Mejora del modelo sobre la regla simple | 14,8 % | 20,2 % |
+   | Error del modelo en CA_4 | 5,97 | 3,98 |
+   | Error de la regla simple en CA_4 | 5,22 | 4,66 |
+
+   Con el producto, en CA_4 la regla simple le gana al modelo. Sin él, el modelo gana. Aun así no se quita del resultado: es parte de lo que le pasa a un negocio real, y la regla simple tampoco lo habría anticipado (su error en ese producto es 21,2 contra 22,5 del modelo).
+
+   **Qué pudo pasar con el producto.** Los datos no traen inventario ni catálogo, así que no se puede comprobar. Las explicaciones razonables son:
+   * se acabó el stock y no llegó más mercancía;
+   * el producto salió del catálogo o se descontinuó;
+   * lo reemplazó otra marca o presentación, o empezó a venderse bajo otro código;
+   * cambió su precio o su lugar en la tienda;
+   * era una oferta o temporada que terminó.
+
+   Hay una pista: en la Navidad de 2014 a 2015 este mismo producto ya había tenido 34 días en cero en CA_4. Con una sola Navidad de historia no se puede saber si es un patrón navideño o una coincidencia. Queda pendiente revisar por qué el modelo de CA_4 no lo capta pese a haber visto rachas largas de ceros en años anteriores.
 4. **Consecuencia para el pronóstico actual.** En los 15 días reales previos al corte, FOODS_3_090 vendió 34 unidades en CA_3 y ninguna en CA_4, y aun así el pronóstico le asigna 383 unidades en 8 días (12,7 % del total). Ese número debe tomarse con cautela y revisarse con el negocio antes de usarlo para pedidos. En producción la respuesta natural es reentrenar con los datos más recientes y vigilar el sesgo por producto, que es justo lo que muestra la página 2.
 5. **La variación de ritmo de 17,4 % a la baja está inflada por la Navidad.** Con el 25 de diciembre en cero, el promedio diario del pronóstico baja. Sin ese día, los 7 días abiertos promedian 432,3, un 5,6 % por debajo del ritmo real reciente.
 
@@ -73,6 +97,7 @@ El modelo gana en 3 de las 4 ventanas y es más parejo (su error va de 7,9 a 9,6
 * La parrilla de hiperparámetros tiene una sola opción: es un punto de partida y no un techo.
 * Solo hay un diciembre (2015) para evaluar y los datos terminan el 31 de diciembre de 2015, sin un examen posterior.
 * No hay datos de inventario, así que un quiebre de stock se ve como demanda cero.
+* El análisis exploratorio no incluye diciembre de 2015 porque es la validación. Un cambio brusco en esas fechas, como el de FOODS_3_090, solo aparece al evaluar.
 * `predicciones.csv` se sobrescribe en cada corrida y no guarda historial. Cada corrida solo trae pronóstico, sin ventas reales.
 * Power BI Desktop lee archivos locales. Para un refresco automático en el servicio haría falta una puerta de enlace de datos o llevar los archivos a OneDrive o SharePoint.
 * El Programador de tareas de Windows no corre con el equipo apagado. Para producción real esto iría en un servidor.
