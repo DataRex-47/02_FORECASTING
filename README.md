@@ -1,4 +1,4 @@
-# Forecasting Retail: pronóstico de ventas a 8 días con tablero en Power BI
+# Forecasting Retail, pronóstico de ventas a 8 días con tablero en Power BI
 
 Proceso en Python que predice, para 20 series (2 tiendas por 10 productos), cuánto se va a vender en los próximos 8 días, y un tablero en Power BI que muestra el pronóstico y mide qué tan confiable es.
 
@@ -6,7 +6,7 @@ Proceso en Python que predice, para 20 series (2 tiendas por 10 productos), cuá
 
 ## El problema de negocio
 
-Quien repone inventario necesita responder una pregunta: **cuánto se va a vender los próximos 8 días, en qué tienda y en qué producto, y cómo va contra lo reciente.** El proyecto entrega esa respuesta cada día en un archivo simple (`predicciones.csv`) y un tablero que lo hace legible para áreas que no programan.
+Quien repone inventario necesita saber **cuánto se va a vender los próximos 8 días, en qué tienda y en qué producto, y cómo va contra lo reciente.** El proyecto entrega esa respuesta cada día en un archivo simple (`predicciones.csv`) y un tablero que lo hace legible para áreas que no programan.
 
 ## Resultado en una mirada
 
@@ -16,9 +16,27 @@ Quien repone inventario necesita responder una pregunta: **cuánto se va a vende
 | ¿Qué tanto se equivoca el modelo? | 8,77 unidades por serie y día (MAE) en cuatro ventanas de prueba de diciembre |
 | ¿Vale la pena frente a una regla simple? | Sí. La regla simple (vender lo mismo que hace 7 días) se equivoca 10,30, así que el modelo mejora 14,8 % |
 | ¿Se pasa o se queda corto? | En promedio se pasa un 1,9 %, con una excepción importante (ver hallazgos) |
-| ¿Y si se deja fuera el producto que se apagó en diciembre? | El error baja a 7,25 contra 9,09 de la regla simple, una mejora de 20,2 %. Se explica en el hallazgo 3 |
+| ¿Y si se deja fuera el producto que se apagó en diciembre? | El error baja a 7,25 contra 9,09 de la regla simple, una mejora de 20,2 %. Es un diagnóstico y no el resultado oficial. Se cuenta en la sección siguiente |
 
-El 25 de diciembre el pronóstico es 0 por una regla de negocio: la tienda cierra.
+El 25 de diciembre el pronóstico es 0 por una regla de negocio, porque la tienda cierra.
+
+## La historia detrás del 14,8 % y el 20,2 %
+
+Con las cuatro semanas de diciembre, el modelo se equivoca menos que la regla simple, y esa mejora es de 14,8 %. Es un buen resultado, pero al abrir el error por tienda y por producto apareció algo raro.
+
+Un solo producto era responsable de buena parte del error. FOODS_3_090 es el 10 % de las filas y concentra el 26 % del error. Vendía unas 3.500 unidades al mes en CA_3 y unas 900 en CA_4, y desde el 1 de diciembre casi dejó de venderse en las dos tiendas. Diciembre se apartó desde el inicio como validación, así que ni el análisis ni el entrenamiento (hasta el 30 de noviembre) podían ver ese cambio. El modelo siguió pronosticando como si nada hubiera pasado y en CA_4 predijo 806 unidades contra 42 reales.
+
+Si ese producto se deja fuera de la cuenta, la mejora sube de 14,8 % a 20,2 %.
+
+![Error del modelo y de la regla simple, con y sin FOODS_3_090](docs/mejora_con_sin_foods.png)
+
+**El 14,8 % es el resultado oficial y el 20,2 % es solo un diagnóstico.** No se quitó el producto del resultado, no se reajustó el modelo para acomodarlo y no se repitió la prueba hasta que saliera mejor. Hay tres razones.
+
+* Encontrar qué producto rompe el pronóstico, y por qué, es parte del trabajo. Esconderlo habría dejado un número más bonito y un modelo menos honesto.
+* La regla simple tampoco lo habría anticipado, así que la comparación entre las dos sigue siendo justa.
+* Probar contra diciembre es difícil por naturaleza. Es un solo mes, es el más atípico del año por la Navidad y es justo el que el modelo no pudo ver al entrenar. Ajustar el modelo para que acierte ahí sería estudiar con las respuestas del examen.
+
+La causa exacta no se puede comprobar con estos datos. Las pistas están en el hallazgo 3.
 
 ## Qué muestra el tablero
 
@@ -35,11 +53,11 @@ hipermercado.db → consulta SQL → DatosParaProduccion.csv (15 días reales + 
 exportar_backtest.py → backtest.csv (4 ventanas de diciembre) → página 2 de Power BI
 ```
 
-La idea que ordena el proyecto: **todo el trabajo difícil ocurre en Python y Power BI es solo la capa de presentación.** Power Query hace limpieza ligera, el modelo de datos es una estrella simple y las medidas DAX son pocas y están documentadas.
+La idea que ordena el proyecto es que **todo el trabajo difícil ocurre en Python, y Power BI es solo la capa de presentación.** Power Query hace limpieza ligera, el modelo de datos es una estrella simple y las medidas DAX son pocas y están documentadas.
 
 **En dos pasos separados.** `reentrenamiento.py` entrena un modelo por serie y los guarda en archivos (solo cuando hay datos nuevos). `ejecuciones.py` carga esos modelos, predice los 8 días y escribe `predicciones.csv` (a diario). Los dos usan las funciones de `funciones.py` y solo se comunican por los modelos guardados.
 
-**El modelo.** Un modelo por serie (20 en total) con `HistGradientBoostingRegressor`. Cada uno usa 75 variables elegidas por información mutua: ventas de los 15 días anteriores, precios de los 7 anteriores, mínimos, máximos y medias móviles, una variable de posible rotura de stock (3, 7 y 15 días seguidos en cero) y calendario (mes, día de la semana, eventos).
+**El modelo.** Un modelo por serie (20 en total) con `HistGradientBoostingRegressor`. Cada uno usa 75 variables elegidas por información mutua, entre ellas ventas de los 15 días anteriores, precios de los 7 anteriores, mínimos, máximos y medias móviles, una variable de posible rotura de stock (3, 7 y 15 días seguidos en cero) y calendario (mes, día de la semana, eventos).
 
 **Pronóstico recursivo.** El modelo predice un solo día. Para predecir 8, cada predicción se escribe como si fuera la venta de ese día y alimenta los rezagos del siguiente. Por eso el error crece con el horizonte.
 
@@ -80,13 +98,13 @@ El modelo gana en 3 de las 4 ventanas y es más parejo (su error va de 7,9 a 9,6
    | Mejora del modelo | 14,8 % | 20,2 % |
    | Error del modelo en CA_4 | 5,97 | 3,98 |
 
-   El producto es el 10 % de las filas y concentra el 26 % del error. No se quita del resultado, porque la regla simple tampoco lo habría anticipado. Los datos no traen inventario ni catálogo, así que la causa no se puede comprobar: pudo ser stock agotado, salida del catálogo, reemplazo por otro producto o código, o una oferta que terminó. El gráfico apunta a una causa estacional: es un producto de temporada que ya caía hacia fin de año. Pero la caída de 2015 fue mucho mayor: unas 4 unidades por tienda y día en diciembre, contra unas 33 de media en los diciembres anteriores. Otra pista: en la Navidad de 2014 a 2015 ya había tenido 34 días en cero en CA_4, pero con una sola Navidad de historia no se sabe si es un patrón.
+   El producto es el 10 % de las filas y concentra el 26 % del error. No se quita del resultado, porque la regla simple tampoco lo habría anticipado. Los datos no traen inventario ni catálogo, así que la causa no se puede comprobar. Pudo ser stock agotado, salida del catálogo, reemplazo por otro producto o código, o una oferta que terminó. El gráfico apunta a una causa estacional, porque es un producto de temporada que ya caía hacia fin de año. Pero la caída de 2015 fue mucho mayor, de unas 4 unidades por tienda y día en diciembre contra unas 33 de media en los diciembres anteriores. Hay otra pista. En la Navidad de 2014 a 2015 ya había tenido 34 días en cero en CA_4, pero con una sola Navidad de historia no se sabe si es un patrón.
 4. **Consecuencia para el pronóstico actual.** En los 15 días reales previos al corte, FOODS_3_090 vendió 34 unidades en CA_3 y ninguna en CA_4, y aun así el pronóstico le asigna 383 unidades en 8 días (12,7 % del total). Ese número debe tomarse con cautela y revisarse con el negocio antes de usarlo para pedidos. En producción la respuesta natural es reentrenar con los datos más recientes y vigilar el sesgo por producto, que es justo lo que muestra la página 2.
 5. **La variación de ritmo de 17,4 % a la baja está inflada por la Navidad.** Con el 25 de diciembre en cero, el promedio diario del pronóstico baja. Sin ese día, los 7 días abiertos promedian 432,3, un 5,6 % por debajo del ritmo real reciente.
 
 ## Límites conocidos
 
-* La parrilla de hiperparámetros tiene una sola opción: es un punto de partida y no un techo.
+* La parrilla de hiperparámetros tiene una sola opción. Es un punto de partida y no un techo.
 * Solo hay un diciembre (2015) para evaluar y los datos terminan el 31 de diciembre de 2015, sin un examen posterior.
 * No hay datos de inventario, así que un quiebre de stock se ve como demanda cero.
 * El análisis exploratorio no incluye diciembre de 2015 porque es la validación. Un cambio brusco en esas fechas, como el de FOODS_3_090, solo aparece al evaluar.
@@ -129,7 +147,7 @@ La base original (`hipermercado.db`), `train.pkl` y los modelos no están en el 
 
 **Tablero de Power BI**
 
-1. Abre el archivo `.pbix` de `07_despliegue` (versión más reciente: `Tablero_Ventas_v3.pbix`).
+1. Abre el archivo `.pbix` de `07_despliegue` (la versión más reciente es `Tablero_Ventas_v3.pbix`).
 2. En Transformar datos, abre Administrar parámetros y cambia `RutaBase` por la ruta de tu carpeta `07_despliegue`, sin la barra final.
 3. Actualiza. Las fechas se leen con cultura `es-CO` y los decimales con `en-US`, ya configurado en las consultas.
 
